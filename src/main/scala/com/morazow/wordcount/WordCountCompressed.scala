@@ -1,12 +1,24 @@
 package com.morazow.wordcount
 
-import com.twitter.scalding._
+import com.twitter.scalding.{Job, Args, TextLine}
 
 class WordCountJob(args : Args) extends Job(args) {
+
+  override def config: Map[AnyRef,AnyRef] = {
+    super.config ++ Map (
+      "mapred.output.compress" -> "true",
+      "mapred.output.compress.type" -> "BLOCK",
+      "mapred.output.compress.codec" -> "org.apache.hadoop.io.compress.GzipCodec",
+      "mapreduce.output.fileoutputformat.compress" -> "true",
+      "mapreduce.output.fileoutputformat.compress.codec" -> "org.apache.hadoop.io.compress.GzipCodec",
+      "mapreduce.output.fileoutputformat.compress.type" -> "BLOCK"
+      )
+  }
+
   TextLine( args("input") )
     .flatMap('line -> 'word) { line : String => line.split("""\s+""") }
     .groupBy('word) { _.size }
-    .write( Tsv( args("output") ) )
+    .write(CompressedTsv( args("output") ) )
 }
 
 object WordCountRunner {
