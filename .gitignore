@@ -16,7 +16,6 @@ dist
 /.settings
 /project/*-shim.sbt
 *.class
-data
 .cache
 *.dot
 *.png
