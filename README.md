@@ -25,40 +25,46 @@ Run on hadoop cluster giving proper input/output paths,
 
 ## More Info
 
-To enable compression we need to change single line in Scalding,
+To enable compression we need to change `DelimitedScheme` in Scalding. I created another trait with Cascading `TextDelimited` sinkCompression enabled.
 ```scala
-trait DelimitedScheme extends SchemedSource {
+trait CompressedDelimitedScheme extends SchemedSource {
   //override these as needed:
   val fields = Fields.ALL
-    //This is passed directly to cascading where null is interpretted as string
-    val types : Array[Class[_]] = null
-    val separator = "\t"
-    val skipHeader = false
-    val writeHeader = false
-    val quote : String = null
+  //This is passed directly to cascading where null is interpretted as string
+  val types : Array[Class[_]] = null
+  val separator = "\t"
+  val skipHeader = false
+  val writeHeader = false
+  val quote : String = null
 
-    // Whether to throw an exception or not if the number of fields does not match an expected number.
-    // If set to false, missing fields will be set to null.
-    val strict = true
+  // Whether to throw an exception or not if the number of fields does not match an expected number.
+  // If set to false, missing fields will be set to null.
+  val strict = true
 
-    // Whether to throw an exception if a field cannot be coerced to the right type.
-    // If set to false, then fields that cannot be coerced will be set to null.
-    val safe = true
+  // Whether to throw an exception if a field cannot be coerced to the right type.
+  // If set to false, then fields that cannot be coerced will be set to null.
+  val safe = true
 
-    //These should not be changed:
-    override def localScheme = new CLTextDelimited(fields, skipHeader, writeHeader, separator, strict, quote, types, safe)
+  //These should not be changed:
+  override def localScheme = new CLTextDelimited(fields, skipHeader, writeHeader, separator, strict, quote, types, safe)
 
-    override def hdfsScheme = {
-      HadoopSchemeInstance(new CHTextDelimited(fields, null, skipHeader, writeHeader, separator, strict, quote, types, safe))
-    }
+  override def hdfsScheme = {
+    val tmp = new CHTextDelimited(fields, CHTextLine.Compress.DEFAULT, 
+                  skipHeader, writeHeader, separator, strict, quote, types, safe)
+    tmp.asInstanceOf[Scheme[JobConf, RecordReader[_, _], OutputCollector[_, _], _, _]]
+
+    // old Scalding code
+    // HadoopSchemeInstance(new CHTextDelimited(fields, null, skipHeader, writeHeader, 
+    //        separator, strict, quote, types, safe))
+  }
 }
 ```
 
-This line, 
-```scala 
-HadoopSchemeInstance(new CHTextDelimited(fields, null, skipHeader, writeHeader, separator, strict, quote, types, safe))
-```
-instead of `null` for second parameter change to Cascading `TextLine.Compress.DEFAULT`,
+And then create compressed Tsv case class by extending above trait.
 ```scala
-HadoopSchemeInstance(new CHTextDelimited(fields, CHTextLine.Compress.DEFAULT, skipHeader, writeHeader, separator, strict, quote, types, safe))
+case class CompressedTsv(p : String,
+  override val fields : Fields = Fields.ALL,
+  override val skipHeader : Boolean = false,
+  override val writeHeader: Boolean = false,
+  override val sinkMode: SinkMode = SinkMode.REPLACE) extends FixedPathSource(p) with CompressedDelimitedScheme
 ```
