@@ -68,3 +68,23 @@ case class CompressedTsv(p : String,
   override val writeHeader: Boolean = false,
   override val sinkMode: SinkMode = SinkMode.REPLACE) extends FixedPathSource(p) with CompressedDelimitedScheme
 ```
+
+Setting Hadoop compression to true, `CompressedTsv` will output compressed otherwise usual `Tsv` output.
+
+```scala
+class WordCountJob(args : Args) extends Job(args) {
+
+  override def config: Map[AnyRef,AnyRef] = {
+    super.config ++ Map (
+      "mapreduce.output.fileoutputformat.compress" -> "true",
+      "mapreduce.output.fileoutputformat.compress.codec" -> "org.apache.hadoop.io.compress.GzipCodec",
+      "mapreduce.output.fileoutputformat.compress.type" -> "BLOCK"
+      )
+  }
+
+  TextLine( args("input") )
+    .flatMap('line -> 'word) { line : String => line.split("""\s+""") }
+    .groupBy('word) { _.size }
+    .write(CompressedTsv( args("output") ) )
+}
+```
